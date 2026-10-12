@@ -59,6 +59,15 @@ export async function createPort(scene, canvas, view, hologyWorld) {
   viewRoot.matrixAutoUpdate = false;
   scene.add(viewRoot, engine.camera);
   const scaleMatrix = new THREE.Matrix4(), inverseCamera = new THREE.Matrix4();
+  const inversePresentation = new THREE.Matrix4();
+  const viewmodel = engine.registry.get('weapons').viewmodel;
+  const muzzleWorld = viewmodel.muzzleWorld.bind(viewmodel);
+  // Simulation/FX coordinates stay in the original world. Only rendering is
+  // compressed around the camera; otherwise muzzle sprites are scaled twice.
+  viewmodel.muzzleWorld = out => muzzleWorld(out).applyMatrix4(inversePresentation);
+  const fx = engine.registry.get('fx');
+  fx._toView = function(pos, dir) { this._p2.copy(pos); this._d2.copy(dir); };
+  fx._fromView = function(pos) { return this._p2.copy(pos); };
   const level = engine.registry.get('world');
   const levelLights = [...level.root.children].filter(o => o.isLight);
   for (const light of levelLights) scene.attach(light);
@@ -83,6 +92,13 @@ export async function createPort(scene, canvas, view, hologyWorld) {
   let accumulator = 0;
   engine.advance = dt => {
     dt = Math.min(0.1, Math.max(0, dt));
+    if (engine.ctx.viewCamera.aspect !== engine.camera.aspect) {
+      engine.ctx.viewCamera.aspect = engine.camera.aspect;
+      engine.ctx.viewCamera.updateProjectionMatrix();
+    }
+    engine.ctx.viewCamera.position.copy(engine.camera.position);
+    engine.ctx.viewCamera.quaternion.copy(engine.camera.quaternion);
+    engine.ctx.viewCamera.updateMatrixWorld(true);
     const t = engine.time;
     t.dt = dt * t.scale; t.raw += dt; t.elapsed += t.dt; t.frame++;
     engine.input.beginFrame();
@@ -101,8 +117,18 @@ export async function createPort(scene, canvas, view, hologyWorld) {
     inverseCamera.copy(engine.camera.matrixWorld).invert();
     scaleMatrix.makeScale(0.12 * scale, 0.12 * scale, 0.12);
     viewRoot.matrix.copy(engine.camera.matrixWorld).multiply(scaleMatrix).multiply(inverseCamera);
+    inversePresentation.copy(viewRoot.matrix).invert();
     viewRoot.matrixWorldNeedsUpdate = true;
     for (const child of [...engine.viewScene.children]) viewRoot.add(child);
+    // LightPool rewrites intensity each update. Preserve inverse-square lighting
+    // when the first-person rig is shrunk for Hology's shared depth buffer.
+    for (const entry of engine.registry.get('fx').viewLights?.lights ?? []) {
+      const light = entry.light;
+      if (light.distance !== light.userData.presentationDistance) light.userData.originalDistance = light.distance;
+      light.distance = (light.userData.originalDistance ?? light.distance) * 0.12;
+      light.userData.presentationDistance = light.distance;
+      light.intensity *= 0.12 * 0.12;
+    }
     engine.input.endFrame();
   };
   engine.dispose = () => {
