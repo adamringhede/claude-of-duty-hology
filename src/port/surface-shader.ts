@@ -6,6 +6,7 @@ import {
   float, vec2, vec3, vec4, abs, select, mix, max, min, cross, dFdx, dFdy,
   standardMaterial, length, clamp, smoothstep, pow, dot,
   type Vec3Node, type FloatNode,
+  colorToNormal,
 } from '@hology/core/shader-nodes'
 
 const safeNormal = (v: Vec3Node) => v.divideScalar(max(length(v), float(0.000001)))
@@ -39,7 +40,7 @@ export function buildSurfaceMaterial(source: THREE.MeshStandardMaterial, p: any,
   const macroMap = new UniformSampler2d('surfaceMacro', shared.macro)
   let sample = map.sample(uv)
   let orm = ormMap.sample(uv).rgb
-  let tangentNormal: Vec3Node = normalMap.sample(uv).rgb.multiplyScalar(2).subtract(vec3(1, 1, 1))
+  let surfaceNormal = colorToNormal(normalMap.sample(uv).rgb, 1)
   if (p.uvMode === 'triplanar') {
     const weights = pow(a, vec3(5, 5, 5))
     const w = weights.divideScalar(max(weights.x.add(weights.y).add(weights.z), float(0.0001)))
@@ -52,9 +53,9 @@ export function buildSurfaceMaterial(source: THREE.MeshStandardMaterial, p: any,
   const duv = uv.multiplyScalar(detailTiles)
   const microSample = detailMap.sample(duv)
   const micro = microSample.a.subtract(0.5).multiply(2)
-  const dn = detailNormal.sample(duv).rgb.multiplyScalar(2).subtract(vec3(1, 1, 1))
-  tangentNormal = vec3(tangentNormal.x.multiply(p.normalStrength).add(dn.x.multiply(p.detail[1]).multiply(detailFade)),
-    tangentNormal.y.multiply(p.normalStrength).add(dn.y.multiply(p.detail[1]).multiply(detailFade)), tangentNormal.z)
+  const dn = colorToNormal(detailNormal.sample(duv).rgb, 1)
+  surfaceNormal = vec3(surfaceNormal.x.multiply(p.normalStrength).add(dn.x.multiply(p.detail[1]).multiply(detailFade)),
+    surfaceNormal.y.multiply(p.normalStrength).add(dn.y.multiply(p.detail[1]).multiply(detailFade)), surfaceNormal.z)
   let albedo: Vec3Node = sample.rgb.multiplyScalar(float(1).add(micro.multiply(0.95).add(microSample.r.subtract(0.5).multiply(1.25)).multiply(p.detail[2]).multiply(detailFade)))
   let ao: FloatNode = orm.r.multiply(float(1).subtract(max(micro.multiply(-1), float(0)).multiply(0.30 * p.detail[2]).multiply(detailFade)))
   let roughness: FloatNode = orm.g
@@ -105,15 +106,6 @@ export function buildSurfaceMaterial(source: THREE.MeshStandardMaterial, p: any,
   metalness = clamp(metalness.multiply(source.metalness), 0, 1)
   ao = clamp(ao.subtract(1).multiply(p.aoStrength).add(1), 0, 1)
 
-  const N = varyingTransformed.normal
-  const posView = varyingTransformed.mvPosition.xyz
-  const dp1 = dFdx(posView), dp2 = dFdy(posView)
-  const tangent = cross(dp2, N).multiplyScalar(dFdx(uv).x).add(cross(N, dp1).multiplyScalar(dFdy(uv).x))
-  const T = safeNormal(select(length(tangent).gt(float(0.000001)), tangent,
-    cross(select(abs(N.y).lt(float(0.99)), vec3(0, 1, 0), vec3(1, 0, 0)), N)))
-  const B = safeNormal(cross(N, T))
-  let shadingNormal = safeNormal(T.multiplyScalar(tangentNormal.x).add(B.multiplyScalar(tangentNormal.y)).add(N.multiplyScalar(tangentNormal.z)))
-
   const opacity = uniformFloat('surfaceOpacity', source.opacity)
   const alpha = p.alphaMask ? sample.a.multiply(opacity) : opacity
   const emissive = uniformVec3('surfaceEmissive', new THREE.Vector3().setFromColor(source.emissive)).multiplyScalar(uniformFloat('surfaceEmissiveIntensity', source.emissiveIntensity))
@@ -126,7 +118,8 @@ export function buildSurfaceMaterial(source: THREE.MeshStandardMaterial, p: any,
   const streetLighting = lighting ? vec3(lighting.sky).multiplyScalar(smoothstep(float(-0.95), float(0.85), worldNormal.y))
     .add(vec3(lighting.ground).multiplyScalar(smoothstep(float(-0.05), float(0.7), worldNormal.y.multiply(-1))))
     .add(vec3(lighting.ground).multiplyScalar(clamp(dot3(worldNormal, vec3(lighting.antiSun)).add(0.12).divide(1.12), 0, 1).multiply(0.008 / 0.013))) : null
-  const shading = { color: albedo.rgba(alpha), roughness, metalness, normal: shadingNormal,
+  const shading = { color: albedo.rgba(alpha), roughness, metalness, 
+    normal: surfaceNormal,
     ambientOcclusion: ao, emissive: emissive.rgb, bakedLight: viewLighting ?? streetLighting }
   const physical = standardMaterial({ ...shading, specular: true })
   const intensity = (source as THREE.MeshPhysicalMaterial).specularIntensity ?? 1
@@ -134,7 +127,8 @@ export function buildSurfaceMaterial(source: THREE.MeshStandardMaterial, p: any,
     metalness.multiply(1 - intensity).add(intensity)) : physical
   const material = new NodeShaderMaterial({
     color: shadedColor,
-    normal: shadingNormal, roughness, opacity: alpha, emissive,
+    normal: surfaceNormal, 
+    roughness, opacity: alpha, emissive,
     envMap: p.localSpace ? shared.environment : undefined,
     transparent: source.transparent, alphaTest: p.alphaMask ? 0.35 : source.alphaTest,
     uniforms: { surfaceTint: { value: new THREE.Vector3().setFromColor(tintColor) },
