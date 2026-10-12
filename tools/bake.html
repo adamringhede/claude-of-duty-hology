@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><title>Offline Claude of Duty texture bake</title>
+<script type="module">
+import * as THREE from 'three';
+import { MaterialSystem } from '../src/legacy/materials/index.js';
+const response = await fetch('/port-textures/manifest.json');
+const manifest = await response.json();
+const renderer = new THREE.WebGLRenderer();
+const library = new MaterialSystem({renderer});
+await library.init({config: {quality:'high', q:{anisotropy:8}}});
+window.bakeSurface = key => {
+ const [name,size,seed,tintA,tintB,param] = key.split('|');
+ const recipe={size:Number(size),seed:Number(seed), worldSize:manifest[key].worldSize, relief:manifest[key].relief};
+ if(tintA) recipe.tintA=Number(tintA);
+ if(tintB) recipe.tintB=Number(tintB);
+ if(param) recipe.param=param.split('_').map(Number);
+ const set=library.getTextureSet(name,{bake:recipe});
+ const result={size:set.size};
+ for(const channel of ['albedo','normal','orm']) {
+  const target=library._forge._owned.find(t=>t.texture===set[channel]);
+  const pixels=new Uint8Array(set.size*set.size*4);
+  renderer.readRenderTargetPixels(target,0,0,set.size,set.size,pixels);
+  const canvas=document.createElement('canvas');
+  canvas.width=canvas.height=set.size;
+  canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(pixels),set.size,set.size),0,0);
+  result[channel]=canvas.toDataURL('image/png').split(',')[1];
+ }
+ return result;
+};
+window.bakeReady=true;
+</script>

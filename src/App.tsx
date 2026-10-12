@@ -1,22 +1,14 @@
 import 'reflect-metadata'
-import './App.css';
 import { HologyScene } from '@hology/react'
-import shaders from './shaders'
-import actors from './actors'
-import components from './components';
 import Game from './services/game'
-
-function App() {
-  return (
-    <div className="app-shell">
-      <HologyScene gameClass={Game} sceneName='main' dataDir='data' shaders={shaders} actors={actors} components={components}>
-      </HologyScene>
-      <div className="reticle" aria-hidden="true">
-        <span />
-        <span />
-      </div>
-    </div>
-  );
+import './App.css'
+export default function App() {
+  return <div className="app-shell">
+    <HologyScene gameClass={Game} sceneName="main" dataDir="data"
+      actors={{}} components={{}} shaders={{}}
+      rendering={{ backend: 'webgpu', maxPixelRatio: 1, bloom: { enabled: true }, reflection: { enabled: false },
+        webgpuPostProcessing: { antiAliasing: 'taa', gtao: {},
+          colorGrading: { toneMapping: 'agx', exposure: 1, vignetteIntensity: 0.08 } } }} />
+    <div id="ui" />
+  </div>
 }
-
-export default App;
