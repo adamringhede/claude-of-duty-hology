@@ -883,6 +883,7 @@ export class WeaponMaterials {
   get(key) {
     if (key === 'cavity') return this.cavity();
     if (key === 'optic_tube') return this.opticTube();
+    if (key === 'glass' && this.lib?.getOpticGlass) return this.lib.getOpticGlass();
     if (key === 'glass') return this.glass();
     if (key === 'lens_ring') return this.lensRing();
     if (key === 'lens_vig') return this.lensVignette();

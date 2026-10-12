@@ -135,11 +135,12 @@ export function buildSurfaceMaterial(source: THREE.MeshStandardMaterial, p: any,
   const material = new NodeShaderMaterial({
     color: shadedColor,
     normal: shadingNormal, roughness, opacity: alpha, emissive,
+    envMap: p.localSpace ? shared.environment : undefined,
     transparent: source.transparent, alphaTest: p.alphaMask ? 0.35 : source.alphaTest,
     uniforms: { surfaceTint: { value: new THREE.Vector3().setFromColor(tintColor) },
       surfaceTile: { value: p.uvMode === 'mesh' ? p.scale : 1 / p.scale },
       surfaceOpacity: { value: source.opacity }, surfaceEmissive: { value: new THREE.Vector3().setFromColor(source.emissive) },
-      surfaceEmissiveIntensity: { value: source.emissiveIntensity } },
+      surfaceEmissiveIntensity: { value: source.emissiveIntensity }, envMapIntensity: { value: source.envMapIntensity } },
   })
   material.name = source.name
   material.side = source.side

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MaterialSystem } from '../legacy/materials/index.js';
 import { DEFAULT_PARAMS } from '../legacy/materials/shader.js';
 import { LIBRARY } from '../legacy/materials/library.js';
+import { buildOpticGlass } from './optic-shader';
 import { buildSurfaceMaterial } from './surface-shader';
 
 /** Portable texture assets and Hology node materials; no WebGL renderer at runtime. */
@@ -45,6 +46,10 @@ export class HologyMaterials extends MaterialSystem {
       this._sets.set(key, set);
     }));
   }
+  getOpticGlass() {
+    if (!this.opticGlass) this.opticGlass = buildOpticGlass(this._shared.environment);
+    return this.opticGlass;
+  }
   getTextureSet(name, opts = {}) {
     const key = this._resolve(name);
     const bake = { ...LIBRARY[key].bake, ...(opts.bake ?? {}) };
@@ -77,12 +82,14 @@ export class HologyMaterials extends MaterialSystem {
   }
   update() {
     for (const material of this.nodeMaterials.values()) {
+      if (material.userData.surfaceParams.localSpace && material.envMapIntensity !== undefined) material.uniforms.envMapIntensity.value = material.envMapIntensity;
       material.uniforms.surfaceEmissive?.value.setFromColor(material.emissive);
       if (material.uniforms.surfaceEmissiveIntensity) material.uniforms.surfaceEmissiveIntensity.value = material.emissiveIntensity;
     }
   }
   finishBaking() {}
   dispose() {
+    this.opticGlass?.dispose();
     for (const m of this.nodeMaterials.values()) m.dispose();
     for (const texture of this.textures) texture.dispose();
     super.dispose();

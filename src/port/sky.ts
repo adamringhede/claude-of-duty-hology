@@ -56,6 +56,7 @@ export class HologySky {
     const groundHue = new THREE.Vector3(this.sunLight.color.r * 0.33,
       this.sunLight.color.g * 0.29, this.sunLight.color.b * 0.225)
     groundHue.divideScalar(Math.max(groundHue.x, groundHue.y, groundHue.z)).multiplyScalar(0.013 * this.sunLight.intensity)
+    ctx.get('materials')._shared.environment = this.environment.source
     ctx.get('materials')._shared.lighting = { sky: skyHue, ground: groundHue,
       antiSun: new THREE.Vector3(-metadata.sunDirection[0] + 1e-4, 0.2801, -metadata.sunDirection[2] + 1e-4).normalize() }
     const direction = normalize(varying(attributes.position))

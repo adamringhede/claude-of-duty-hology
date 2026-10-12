@@ -44,7 +44,7 @@ class Game extends GameInstance {
       this.rendering.setResolutionScale(this.port.config.q.renderScale)
       this.rendering.setAntiAliasingMode(quality === 'low' ? 'fxaa' : 'taa')
       this.rendering.setGTAOQuality(quality === 'low' ? 'off' : quality === 'ultra' ? 'high' : 'medium')
-      this.rendering.configureAmbientOcclusion(quality !== 'low', 1.1, { radius: 1.35 })
+      this.rendering.configureAmbientOcclusion(quality !== 'low', 1.1, { radius: 1.35, enabled: true, thickness: 1, intensity: 1.1 })
       this.rendering.setMotionBlurOptions({ enabled: this.port.config.q.motionBlur,
         shutterScale: 0.42, cameraBlurScale: 1, objectBlurScale: 1,
         maxBlurPixels: 48, sampleCount: 16, depthRejectionStrength: 6, dilation: true })
