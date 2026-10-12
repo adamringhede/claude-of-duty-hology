@@ -1,0 +1,6 @@
+{
+  "dataPath": "public/data",
+  "shadersPath": "src/shaders",
+  "actorsPath": "src/actors",
+  "componentsPath": "src/components"
+}

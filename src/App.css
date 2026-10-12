@@ -1,0 +1,43 @@
+#root,
+body,
+html {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+.app-shell {
+  position: fixed;
+  inset: 0;
+  background: #0b0f12;
+}
+
+.reticle {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.reticle span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+  transform: translate(-50%, -50%);
+}
+
+.reticle span:first-child {
+  width: 18px;
+  height: 2px;
+}
+
+.reticle span:last-child {
+  width: 2px;
+  height: 18px;
+}
