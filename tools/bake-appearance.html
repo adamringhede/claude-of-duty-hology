@@ -1,0 +1,38 @@
+<!doctype html><meta charset="utf-8"><title>Offline appearance bake</title>
+<script type="module">
+import * as THREE from 'three';
+import { MaterialSystem } from '../src/legacy/materials/index.js';
+import { SkySystem } from '../src/legacy/sky/index.js';
+import { createConfig } from '../src/legacy/core/config.js';
+import { EventBus } from '../src/legacy/core/registry.js';
+import { blit } from '../src/legacy/sky/fullscreen.js';
+const renderer = new THREE.WebGLRenderer();
+const config=createConfig({quality:'high',deterministic:true});
+const scene=new THREE.Scene();
+const bridge={renderer,addLight(){},registerPass(){return ()=>{};},setEnvMap(texture){scene.environment=texture;}};
+const ctx={config,scene,camera:new THREE.PerspectiveCamera(),events:new EventBus(),get:()=>bridge,peek:()=>null,time:{elapsed:0}};
+const materials=new MaterialSystem({renderer});
+await materials.init(ctx);
+const sky=new SkySystem();
+await sky.init(ctx);
+function png(texture){
+ const target=materials._forge._owned.find(t=>t.texture===texture);
+ const data=new Uint8Array(target.width*target.height*4);
+ renderer.readRenderTargetPixels(target,0,0,target.width,target.height,data);
+ const canvas=document.createElement('canvas');canvas.width=target.width;canvas.height=target.height;
+ canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data),target.width,target.height),0,0);
+ return canvas.toDataURL('image/png').split(',')[1];
+}
+function base64(bytes){let result='';for(let i=0;i<bytes.length;i+=32768)result+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(result);}
+window.exportAppearance=()=>{
+ const target=new THREE.WebGLRenderTarget(2048,1024,{type:THREE.HalfFloatType,depthBuffer:false,colorSpace:THREE.NoColorSpace});
+ const original=sky.dome.envMaterial.fragmentShader;
+ sky.dome.envMaterial.fragmentShader=original.replace('skSample( normalize( dir ), 0 )','skSample( normalize( dir ), 1 )');
+ sky.dome.envMaterial.needsUpdate=true;
+ blit(renderer,sky.dome.envMaterial,target);
+ const data=new Uint16Array(2048*1024*4);renderer.readRenderTargetPixels(target,0,0,2048,1024,data);
+ return {sky:base64(new Uint8Array(data.buffer)),detailAlbedo:png(materials._shared.detailAlbedo),detailNormal:png(materials._shared.detailNormal),macro:png(materials._shared.macro),
+ metadata:{width:2048,height:1024,hour:sky.hour,sunDirection:sky.sunDirection.toArray(),sunColor:sky.sunLight.color.toArray(),sunIntensity:sky.sunLight.intensity,ambientColor:sky.ambientColor.toArray(),indirectScale:sky.indirectScale,exposureBias:sky.exposureBias}};
+};
+window.appearanceReady=true;
+</script>

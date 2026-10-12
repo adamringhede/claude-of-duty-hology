@@ -14,6 +14,17 @@ export class HologyMaterials extends MaterialSystem {
     this._built = true; this._shared = { detailNormal: null, macro: null };
     this.nodeMaterials = new Map();
     this.textures = new Set();
+    const sharedLoader = new THREE.TextureLoader();
+    this._shared = Object.fromEntries(await Promise.all(['detailAlbedo', 'detailNormal', 'macro'].map(async name => {
+      const texture = await sharedLoader.loadAsync(`${import.meta.env.BASE_URL}appearance/${name}.png`);
+      texture.flipY = false;
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.anisotropy = ctx.config.q.anisotropy;
+      texture.needsUpdate = true;
+      this.textures.add(texture);
+      return [name, texture];
+    })));
     const base = `${import.meta.env.BASE_URL}port-textures/`;
     const response = await fetch(`${base}manifest.json`);
     if (!response.ok) throw new Error(`Texture manifest: HTTP ${response.status}`);
@@ -46,7 +57,12 @@ export class HologyMaterials extends MaterialSystem {
     const source = super.get(name, opts);
     if (this.nodeMaterials.has(source)) return this.nodeMaterials.get(source);
     const p = { ...DEFAULT_PARAMS, ...LIBRARY[this._resolve(name)].mat, ...opts };
-    const material = buildSurfaceMaterial(source, p);
+    // Some generated overrides supply only two roughness components. Fill
+    // missing vector components explicitly; undefined becomes NaN in a graph.
+    for (const [name, defaults] of Object.entries(DEFAULT_PARAMS)) {
+      if (Array.isArray(defaults)) p[name] = defaults.map((value, index) => p[name]?.[index] ?? value);
+    }
+    const material = buildSurfaceMaterial(source, p, this._shared);
     this.nodeMaterials.set(source, material);
     return material;
   }

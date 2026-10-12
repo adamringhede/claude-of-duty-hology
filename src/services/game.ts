@@ -1,6 +1,8 @@
 import { Service, GameInstance, inject, World, ViewController } from '@hology/core/gameplay'
 import { RenderingView } from '@hology/core/rendering'
 import { createPort } from '../port/runtime'
+import { AgXToneMapping } from 'three'
+import { createOriginalComposite } from '../port/composite-shader'
 
 @Service()
 class Game extends GameInstance {
@@ -11,14 +13,25 @@ class Game extends GameInstance {
   private tick: { unsubscribe(): void }
   private releaseStatic?: () => void
   private releaseQuality?: () => void
+  private composite?: ReturnType<typeof createOriginalComposite>
+  private compositeEffect?: { dispose(): void }
 
   async onPreload() {
     // Compile the empty starter once to acquire its canvas and activate the backend.
     // Hology compiles the generated content again after this preload hook returns.
     await this.rendering.compileAsync()
+    this.rendering.setBaseToneMapping(AgXToneMapping, 4.84)
     if (this.view.activeBackend !== 'webgpu') throw new Error('Claude of Duty requires Hology WebGPU.')
-    this.world.directionalLight.intensity = 3.2
     this.port = await createPort(this.world.scene, this.rendering.canvas!, this.view, this.world)
+    const sky = this.port.registry.get('sky')
+    this.rendering.csm?.lights.forEach(light => light.color.copy(sky.sunLight.color))
+    this.rendering.setWorldEnvironment(sky.environment)
+    this.composite = createOriginalComposite()
+    this.compositeEffect = this.view.addPostProcessEffect(this.composite.output, { stage: 'beforeOutput' })
+    // The original composites its first-person pass after world motion blur.
+    this.world.scene.children.find(o => o.name === 'First person presentation')?.traverse(o => {
+      if ('isMesh' in o) this.rendering.setObjectMotionBlur(o, 'disabled')
+    })
     this.view.setCamera(this.port.camera)
     this.releaseStatic = this.rendering.registerExperimentalStaticDrawSet(
       this.port.registry.get('world').root, 'Claude of Duty level', false, 'throw'
@@ -28,6 +41,9 @@ class Game extends GameInstance {
       this.rendering.setResolutionScale(this.port.config.q.renderScale)
       this.rendering.setAntiAliasingMode(quality === 'low' ? 'fxaa' : 'taa')
       this.rendering.setGTAOQuality(quality === 'low' ? 'off' : quality === 'ultra' ? 'high' : 'medium')
+      this.rendering.setMotionBlurOptions({ enabled: this.port.config.q.motionBlur,
+        shutterScale: 0.42, cameraBlurScale: 1, objectBlurScale: 1,
+        maxBlurPixels: 48, sampleCount: 16, depthRejectionStrength: 6, dilation: true })
     }
     applyQuality()
     this.releaseQuality = this.port.events.on('ui:quality', applyQuality)
@@ -40,6 +56,8 @@ class Game extends GameInstance {
   }
   onUnload() {
     this.tick?.unsubscribe()
+    this.compositeEffect?.dispose()
+    this.composite?.texture.dispose()
     this.releaseQuality?.()
     this.releaseStatic?.()
     this.port?.dispose()
@@ -47,3 +65,5 @@ class Game extends GameInstance {
   }
 }
 export default Game
+
+

@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><style>html,body,#probe{margin:0;width:100%;height:100%;overflow:hidden}</style><div id="probe"></div>
+<script type="module">
+import * as THREE from 'three';
+import {RenderingView} from '@hology/core/rendering';
+import {NodeShaderMaterial,vec3,UniformSampler2d,varyingAttributes} from '@hology/core/shader-nodes';
+const view=new RenderingView(document.getElementById('probe'),{backend:'webgpu',msaa:false,bloom:{enabled:false},reflection:{enabled:false},webgpuPostProcessing:{antiAliasing:'off',gtao:false,bloom:false,colorGrading:{toneMapping:'none',exposure:1}}});
+view.camera=new THREE.OrthographicCamera(-1,1,0.5,-0.5,0.1,10);view.camera.position.z=2;view.camera.updateMatrixWorld();
+view.scene.fog=null;
+const left=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new NodeShaderMaterial({color:vec3(0.5,0.5,0.5).rgba(1),fog:false}));left.position.x=-0.5;view.scene.add(left);
+const data=new Uint8Array([128,128,128,255]);const tex=new THREE.DataTexture(data,1,1);tex.colorSpace=THREE.SRGBColorSpace;tex.needsUpdate=true;
+const right=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new NodeShaderMaterial({color:new UniformSampler2d('colorProbe',tex).sample(varyingAttributes.uv),fog:false}));right.position.x=0.5;view.scene.add(right);
+view.setBaseToneMapping(THREE.NoToneMapping,1);
+await view.compileAsync();await view.initTexturesAsync();view.render(0);await view.webGpuDevice.queue.onSubmittedWorkDone();window.__PROBE_READY__=true;
+</script>

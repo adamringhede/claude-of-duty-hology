@@ -8,7 +8,11 @@ export default function App() {
       actors={{}} components={{}} shaders={{}}
       rendering={{ backend: 'webgpu', maxPixelRatio: 1, bloom: { enabled: true }, reflection: { enabled: false },
         webgpuPostProcessing: { antiAliasing: 'taa', gtao: {},
-          colorGrading: { toneMapping: 'agx', exposure: 1, vignetteIntensity: 0.08 } } }} />
+          motionBlur: { enabled: true, sampleCount: 16, shutterScale: 0.42,
+            cameraBlurScale: 1, objectBlurScale: 1, maxBlurPixels: 48,
+            depthRejectionStrength: 6, dilation: true },
+          colorGrading: false } }} />
     <div id="ui" />
   </div>
 }
+

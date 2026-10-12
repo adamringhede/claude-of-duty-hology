@@ -16,7 +16,7 @@ import { HologySky } from './sky';
 class RenderBridge {
   static id = 'render';
   static deps = [];
-  init(ctx) { this.ctx = ctx; this.settings = {}; this.sunDir = new THREE.Vector3(); }
+  init(ctx) { this.ctx = ctx; this.rng = ctx.rng.fork(); this.settings = {}; this.sunDir = new THREE.Vector3(); }
   addLight() {}
   patchMaterials() {}
   setExposureBias() {}
@@ -101,3 +101,4 @@ export async function createPort(scene, canvas, view, hologyWorld) {
   console.info('[port] Hology WebGPU owns rendering and frame scheduling.');
   return engine;
 }
+
