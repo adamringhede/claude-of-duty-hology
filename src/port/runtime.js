@@ -62,9 +62,17 @@ export async function createPort(scene, canvas, view, hologyWorld) {
   const inversePresentation = new THREE.Matrix4();
   const viewmodel = engine.registry.get('weapons').viewmodel;
   const muzzleWorld = viewmodel.muzzleWorld.bind(viewmodel);
+  const ejectWorld = viewmodel.ejectWorld.bind(viewmodel);
+  const ejectVelocity = viewmodel.ejectVelocity.bind(viewmodel);
   // Simulation/FX coordinates stay in the original world. Only rendering is
   // compressed around the camera; otherwise muzzle sprites are scaled twice.
   viewmodel.muzzleWorld = out => muzzleWorld(out).applyMatrix4(inversePresentation);
+  viewmodel.ejectWorld = out => ejectWorld(out).applyMatrix4(inversePresentation);
+  viewmodel.ejectVelocity = (out, speed) => {
+    ejectVelocity(out, speed);
+    const length = out.length();
+    return out.transformDirection(inversePresentation).multiplyScalar(length);
+  };
   const fx = engine.registry.get('fx');
   fx._toView = function(pos, dir) { this._p2.copy(pos); this._d2.copy(dir); };
   fx._fromView = function(pos) { return this._p2.copy(pos); };
