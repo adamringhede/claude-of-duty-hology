@@ -1,7 +1,7 @@
 import { Service, GameInstance, inject, World, ViewController } from '@hology/core/gameplay'
 import { RenderingView } from '@hology/core/rendering'
 import { createPort } from '../port/runtime'
-import { AgXToneMapping } from 'three'
+import { NoToneMapping } from 'three'
 import { createOriginalComposite } from '../port/composite-shader'
 
 @Service()
@@ -20,9 +20,12 @@ class Game extends GameInstance {
     // Compile the empty starter once to acquire its canvas and activate the backend.
     // Hology compiles the generated content again after this preload hook returns.
     await this.rendering.compileAsync()
-    this.rendering.setBaseToneMapping(AgXToneMapping, 4.84)
+    this.rendering.setBaseToneMapping(NoToneMapping, 1)
     if (this.view.activeBackend !== 'webgpu') throw new Error('Claude of Duty requires Hology WebGPU.')
     this.port = await createPort(this.world.scene, this.rendering.canvas!, this.view, this.world)
+    // Empty starter scenes still receive Hology's default white hemisphere.
+    // The original game supplies its own shader-based indirect lighting.
+    this.world.scene.children.filter(o => o.type === 'HemisphereLight' || o.type === 'AmbientLight').forEach(o => o.removeFromParent())
     const sky = this.port.registry.get('sky')
     this.rendering.csm?.lights.forEach(light => light.color.copy(sky.sunLight.color))
     this.rendering.setWorldEnvironment(sky.environment)
@@ -41,6 +44,7 @@ class Game extends GameInstance {
       this.rendering.setResolutionScale(this.port.config.q.renderScale)
       this.rendering.setAntiAliasingMode(quality === 'low' ? 'fxaa' : 'taa')
       this.rendering.setGTAOQuality(quality === 'low' ? 'off' : quality === 'ultra' ? 'high' : 'medium')
+      this.rendering.configureAmbientOcclusion(quality !== 'low', 1.1, { radius: 1.35 })
       this.rendering.setMotionBlurOptions({ enabled: this.port.config.q.motionBlur,
         shutterScale: 0.42, cameraBlurScale: 1, objectBlurScale: 1,
         maxBlurPixels: 48, sampleCount: 16, depthRejectionStrength: 6, dilation: true })
@@ -65,5 +69,6 @@ class Game extends GameInstance {
   }
 }
 export default Game
+
 
 

@@ -41,14 +41,23 @@ export class HologySky {
     }
     this.skyTexture = hdr(visibleBytes, metadata.width, metadata.height)
     this.skyTexture.mapping = THREE.UVMapping
-    this.environment = { source: hdr(environmentBytes, metadata.environmentWidth, metadata.environmentHeight), intensity: 0.25 }
+    this.environment = { source: hdr(environmentBytes, metadata.environmentWidth, metadata.environmentHeight), intensity: 1.6 * 0.030 * metadata.indirectScale }
     this.sunLight.color.fromArray(metadata.sunColor)
     this.sunLight.intensity = metadata.sunIntensity
-    // The original adds a cool upper band and a much weaker warm street-bounce band.
-    this.fill.color.setRGB(0.6, 0.75, 1)
-    this.fill.groundColor.setRGB(0.095, 0.083, 0.065)
-    this.fill.intensity = 0.5
-    ctx.scene.add(this.fill)
+    // Preserve the original upper-sky and street-bounce irradiance budget.
+    const skyHue = new THREE.Vector3().fromArray(metadata.ambientColor)
+    const ambientLevel = Math.max(skyHue.x, skyHue.y, skyHue.z)
+    skyHue.divideScalar(ambientLevel)
+    const luminance = skyHue.dot(new THREE.Vector3(0.2126, 0.7152, 0.0722))
+    skyHue.set(Math.max(0, luminance + (skyHue.x - luminance) * 1.18),
+      Math.max(0, luminance + (skyHue.y - luminance) * 1.18),
+      Math.max(0, luminance + (skyHue.z - luminance) * 1.18))
+    skyHue.divideScalar(Math.max(skyHue.x, skyHue.y, skyHue.z)).multiplyScalar(0.32 * ambientLevel / 0.15)
+    const groundHue = new THREE.Vector3(this.sunLight.color.r * 0.33,
+      this.sunLight.color.g * 0.29, this.sunLight.color.b * 0.225)
+    groundHue.divideScalar(Math.max(groundHue.x, groundHue.y, groundHue.z)).multiplyScalar(0.013 * this.sunLight.intensity)
+    ctx.get('materials')._shared.lighting = { sky: skyHue, ground: groundHue,
+      antiSun: new THREE.Vector3(-metadata.sunDirection[0] + 1e-4, 0.2801, -metadata.sunDirection[2] + 1e-4).normalize() }
     const direction = normalize(varying(attributes.position))
     const uv = vec2(atan2(direction.z, direction.x).divide(2 * Math.PI).add(0.5),
       asin(clamp(direction.y, -1, 1)).divide(Math.PI).add(0.5))

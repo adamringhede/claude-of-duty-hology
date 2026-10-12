@@ -122,8 +122,12 @@ export function buildSurfaceMaterial(source: THREE.MeshStandardMaterial, p: any,
     .add(vec3(0.56, 0.74, 1).multiplyScalar(max(float(0), dot3(varyingTransformed.normal, safeNormal(vec3(0.6, -0.15, 0.5)))).multiply(0.76)))
     .add(vec3(1, 0.8, 0.55).multiplyScalar(max(float(0), dot3(varyingTransformed.normal, safeNormal(vec3(0.2, 0.35, -0.9)))).multiply(1.26)))
     .add(vec3(1, 0.75, 0.5).multiplyScalar(max(float(0), dot3(varyingTransformed.normal, safeNormal(vec3(-0.2, -0.86, 0.47)))).multiply(0.86))) : null
+  const lighting = shared.lighting
+  const streetLighting = lighting ? vec3(lighting.sky).multiplyScalar(smoothstep(float(-0.95), float(0.85), worldNormal.y))
+    .add(vec3(lighting.ground).multiplyScalar(smoothstep(float(-0.05), float(0.7), worldNormal.y.multiply(-1))))
+    .add(vec3(lighting.ground).multiplyScalar(clamp(dot3(worldNormal, vec3(lighting.antiSun)).add(0.12).divide(1.12), 0, 1).multiply(0.008 / 0.013))) : null
   const shading = { color: albedo.rgba(alpha), roughness, metalness, normal: shadingNormal,
-    ambientOcclusion: ao, emissive: emissive.rgb, bakedLight: viewLighting }
+    ambientOcclusion: ao, emissive: emissive.rgb, bakedLight: viewLighting ?? streetLighting }
   const physical = standardMaterial({ ...shading, specular: true })
   const intensity = (source as THREE.MeshPhysicalMaterial).specularIntensity ?? 1
   const shadedColor = intensity < 1 ? mix(standardMaterial({ ...shading, specular: false }), physical,

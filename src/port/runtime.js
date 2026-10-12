@@ -16,8 +16,22 @@ import { HologySky } from './sky';
 class RenderBridge {
   static id = 'render';
   static deps = [];
-  init(ctx) { this.ctx = ctx; this.rng = ctx.rng.fork(); this.settings = {}; this.sunDir = new THREE.Vector3(); }
-  addLight() {}
+  init(ctx) { this.ctx = ctx; this.rng = ctx.rng.fork(); this.settings = { practicalGain: 0.55 }; this.lights = []; this.sunDir = new THREE.Vector3(); }
+  addLight(light, opts = {}) {
+    if (light && !this.lights.some(e => e.light === light)) this.lights.push({ light,
+      range: opts.range ?? light.distance ?? 25, baseIntensity: light.intensity, applied: undefined });
+    return light;
+  }
+  removeLight(light) { const i = this.lights.findIndex(e => e.light === light); if (i >= 0) this.lights.splice(i, 1); }
+  lateUpdate() {
+    for (const e of this.lights) {
+      if (e.applied !== undefined && e.light.intensity !== e.applied) e.baseIntensity = e.light.intensity;
+      const distance = e.light.position.distanceTo(this.ctx.camera.position);
+      const fade = 1 - THREE.MathUtils.smoothstep(distance, e.range * 0.75, e.range * 1.15);
+      e.applied = e.baseIntensity * fade * (e.range <= 30 ? this.settings.practicalGain : 1);
+      e.light.intensity = e.applied; e.light.visible = fade > 0.002;
+    }
+  }
   patchMaterials() {}
   setExposureBias() {}
   requestEnvMap() { return this.ctx.scene.environment; }

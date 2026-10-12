@@ -7,7 +7,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [], checks = [];
 const check = (name, condition, detail) => { assert.ok(condition, `${name}: ${JSON.stringify(detail)}`); checks.push({name,detail}); console.log('PASS',name,JSON.stringify(detail)); };
 page.on('pageerror', e => {errors.push(e.stack); console.error(e.stack);});
-page.on('console', msg => { if(msg.type()==='error') {errors.push(msg.text());console.error(msg.text());} else if (msg.text().includes('[port]') || msg.text().includes('static draw') || msg.text().includes('Keeping static root') || msg.text().includes('[Hology GPU VFX warmup]')) console.log(msg.text()); });
+page.on('console', msg => { if(msg.type()==='error' || /Skipping custom post-process|Falling back/.test(msg.text())) {errors.push(msg.text());console.error(msg.text());} else if (msg.text().includes('[port]') || msg.text().includes('static draw') || msg.text().includes('Keeping static root') || msg.text().includes('[Hology GPU VFX warmup]')) console.log(msg.text()); });
 await page.addInitScript(() => {
  window.__CONTEXT_REQUESTS__=[];
  const original=HTMLCanvasElement.prototype.getContext;
@@ -23,9 +23,11 @@ const frames = async n => {
 };
 try {
  await fs.mkdir(new URL('../artifacts/',import.meta.url),{recursive:true});
- await page.goto(base);
+ await page.goto(base+'/?q=high');
  await page.waitForFunction(()=>window.__READY__,null,{timeout:180000});
  await frames(90);
+ check('Starter lighting removed',await page.evaluate(()=>!window.__ENGINE__.scene.children.some(o=>o.type==='HemisphereLight'||o.type==='AmbientLight')));
+ check('GTAO passes execute',await page.evaluate(()=>window.__HOLOGY_VIEW__.getLastFrameProfile().passes.some(p=>p.name==='GTAOCompositePass')));
  check('Hology WebGPU backend',await page.evaluate(()=>window.__HOLOGY_VIEW__.activeBackend==='webgpu'));
  check('Static level draw set active',await page.evaluate(()=>[...window.__HOLOGY_VIEW__.view.experimentalStaticDrawSetRegistrations].some(r=>r.staticDrawSet?.drawCount>0)));
  const contexts=await page.evaluate(()=>window.__CONTEXT_REQUESTS__);
@@ -85,3 +87,4 @@ try {
  await fs.writeFile(new URL('../artifacts/verification.json',import.meta.url),JSON.stringify({url:base,checks,errors,profile},null,2));
  console.log('VERIFIED',checks.length,'checks');
 } finally {await browser.close();}
+
