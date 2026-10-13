@@ -77,12 +77,26 @@ export async function createPort(scene, canvas, view, hologyWorld) {
   fx._toView = function(pos, dir) { this._p2.copy(pos); this._d2.copy(dir); };
   fx._fromView = function(pos) { return this._p2.copy(pos); };
   const level = engine.registry.get('world');
+  // Adapt legacy authoring hints at the integration boundary. The renderer
+  // snapshots generic policies per instance; generated source assets stay intact.
+  const detailEnabled = params.get('detail') !== 'off';
+  level.root.userData.detailCulling = { enabled: detailEnabled, minScreenSize: 2,
+    shadow: { enabled: detailEnabled, minScreenSize: 2 } };
+  level.root.traverse(object => {
+    const maxDistance = object.userData.owLodDist;
+    if (detailEnabled && Number.isFinite(maxDistance) && maxDistance > 0) {
+      object.userData.detailCulling = { maxDistance };
+    }
+  });
+  viewRoot.userData.detailCulling = { enabled: false, shadow: { enabled: false } };
+
   const levelLights = [...level.root.children].filter(o => o.isLight);
   for (const light of levelLights) scene.attach(light);
   // StaticDrawSet v1 cannot sort transparency. Preserve glass/decals as ordinary
   // draws rather than letting an unsupported-material skip hide them with the root.
   const transparentRoot = new THREE.Group();
   transparentRoot.name = 'world-transparent';
+  transparentRoot.userData.detailCulling = level.root.userData.detailCulling;
   scene.add(transparentRoot);
   for (const object of [...level.root.children]) {
     const materials = Array.isArray(object.material) ? object.material : [object.material];
