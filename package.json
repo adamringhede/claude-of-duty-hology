@@ -9,18 +9,22 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "verify": "node tools/verify.mjs",
-    "bake:textures": "node tools/bake-textures.mjs"
+    "bake:textures": "node tools/bake-textures.mjs",
+    "verify:detail": "node tools/verify-detail.mjs",
+    "measure:detail": "node tools/measure-detail.mjs",
+    "summarize:detail": "node tools/summarize-detail.mjs",
+    "verify:shadows": "node tools/verify-shadow-scheduling.mjs"
   },
   "dependencies": {
-    "@hology/core": "file:vendor/hology-core-0.0.267-ao.tgz",
+    "@hology/core": "0.0.268",
     "@hology/react": "^0.0.21",
-    "@hology/webgpu-renderer": "file:vendor/hology-webgpu-renderer-0.1.19.tgz",
+    "@hology/webgpu-renderer": "0.1.20",
     "@preact/signals-react": "^2.1.0",
     "@types/three": "0.169.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "0.169.0",
-    "three-shader-graph": "file:vendor/three-shader-graph-0.2.67.tgz"
+    "three-shader-graph": "0.2.70"
   },
   "overrides": {
     "@hology/vite-plugin": {
