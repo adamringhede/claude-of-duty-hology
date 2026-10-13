@@ -36,6 +36,11 @@ class Game extends GameInstance {
       if ('isMesh' in o) this.rendering.setObjectMotionBlur(o, 'disabled')
     })
     this.view.setCamera(this.port.camera)
+    this.rendering.setDirectionalShadowUpdateOptions({
+      enabled: new URLSearchParams(location.search).get('shadowScheduling') !== 'off',
+      maxUpdateHz: 60, cascadeUpdateHz: [60, 30, 15, 7.5],
+      maxUpdatesPerFrame: 2, coverageMargin: .05,
+    })
     this.releaseStatic = this.rendering.registerExperimentalStaticDrawSet(
       this.port.registry.get('world').root, 'Claude of Duty level', false, 'throw'
     )
