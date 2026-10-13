@@ -41,9 +41,9 @@ export class HologySky {
     }
     this.skyTexture = hdr(visibleBytes, metadata.width, metadata.height)
     this.skyTexture.mapping = THREE.UVMapping
-    this.environment = { source: hdr(environmentBytes, metadata.environmentWidth, metadata.environmentHeight), intensity: 1.6 * 0.030 * metadata.indirectScale }
+    this.environment = { source: hdr(environmentBytes, metadata.environmentWidth, metadata.environmentHeight), intensity: 1 }
     this.sunLight.color.fromArray(metadata.sunColor)
-    this.sunLight.intensity = metadata.sunIntensity
+    this.sunLight.intensity = metadata.referenceSunIntensity ?? metadata.sunIntensity
     // Preserve the original upper-sky and street-bounce irradiance budget.
     const skyHue = new THREE.Vector3().fromArray(metadata.ambientColor)
     const ambientLevel = Math.max(skyHue.x, skyHue.y, skyHue.z)
@@ -56,8 +56,20 @@ export class HologySky {
     const groundHue = new THREE.Vector3(this.sunLight.color.r * 0.33,
       this.sunLight.color.g * 0.29, this.sunLight.color.b * 0.225)
     groundHue.divideScalar(Math.max(groundHue.x, groundHue.y, groundHue.z)).multiplyScalar(0.013 * this.sunLight.intensity)
+    const sunRGB = new THREE.Vector3().setFromColor(this.sunLight.color)
+    const skyRGB = skyHue.clone().divideScalar(Math.max(skyHue.x, skyHue.y, skyHue.z))
+    const groundRGB = groundHue.clone().divideScalar(Math.max(groundHue.x, groundHue.y, groundHue.z))
+    const reference = Math.max(this.sunLight.intensity, ambientLevel / 0.15)
+    const keyIntensity = Math.min(4.6 * Math.pow(Math.min(reference / 4.6, 1), 0.65) * 0.55, 2.6)
+    const view = {
+      key: sunRGB.clone().multiplyScalar(keyIntensity),
+      fill: skyRGB.multiplyScalar(keyIntensity * 0.3),
+      rim: sunRGB.clone().multiply(new THREE.Vector3(1, 0.94, 0.82)).multiplyScalar(keyIntensity * 0.5),
+      bounce: groundRGB.multiply(new THREE.Vector3(1, 0.86, 0.62)).multiplyScalar(keyIntensity * 0.34),
+      hemisphereIntensity: keyIntensity * 0.16,
+    }
     ctx.get('materials')._shared.environment = this.environment.source
-    ctx.get('materials')._shared.lighting = { sky: skyHue, ground: groundHue,
+    ctx.get('materials')._shared.lighting = { sky: skyHue, ground: groundHue, view,
       antiSun: new THREE.Vector3(-metadata.sunDirection[0] + 1e-4, 0.2801, -metadata.sunDirection[2] + 1e-4).normalize() }
     const direction = normalize(varying(attributes.position))
     const uv = vec2(atan2(direction.z, direction.x).divide(2 * Math.PI).add(0.5),
@@ -97,7 +109,7 @@ export class HologySky {
     this.dome.position.copy(this.ctx.camera.position)
   }
   dispose() {
-    this.dome.removeFromParent(); this.fill.removeFromParent()
+    this.dome.removeFromParent()
     this.dome.geometry.dispose(); this.material.dispose()
     this.skyTexture.dispose(); this.environment.source.dispose()
   }

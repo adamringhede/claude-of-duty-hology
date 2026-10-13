@@ -60,7 +60,10 @@ class Game extends GameInstance {
     this.port.advance(0)
   }
   onStart() {
-    this.tick = this.view.onUpdate().subscribe(dt => this.port.advance(dt))
+    this.tick = this.view.onUpdate().subscribe(dt => {
+      this.port.advance(dt)
+      this.composite!.vignette.value = 0.24 + 0.34 * this.port.registry.get('weapons').adsProgress
+    })
     Object.assign(window, { __ENGINE__: this.port, __HOLOGY_VIEW__: this.view, __READY__: true })
   }
   onUnload() {

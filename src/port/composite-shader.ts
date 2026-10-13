@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { createGradeLut } from '../legacy/render/lut.js'
 import {
-  sampleSceneColor, screenUV, uniformFloat, UniformSampler2d, vec2, vec3,
+  sampleSceneColor, sceneColorSampler, textureSize, smoothstep, screenUV, uniformFloat, UniformSampler2d, vec2, vec3,
   mat4, vec4, clamp, max, min, pow, log2, dot, mix, floor, select, float,
   type FloatNode, type Vec3Node,
 } from '@hology/core/shader-nodes'
@@ -37,8 +37,27 @@ export function createOriginalComposite() {
   texture.needsUpdate = true
   const sampler = new UniformSampler2d('originalGrade', texture)
   const exposure = uniformFloat('originalExposure', 4.84)
+  const vignette = uniformFloat('originalVignette', 0.24)
   const source = sampleSceneColor(screenUV)
-  let color: Vec3Node = source.rgb.multiplyScalar(exposure)
+  // Reproduce the original contrast-adaptive luminance sharpening after TAA.
+  const size = textureSize(sceneColorSampler, 0)
+  const texel = vec2(float(1).divide(float(size.x)), float(1).divide(float(size.y)))
+  const lum = (v: Vec3Node) => dot(vec3(v.x, v.y, v.z), vec3(0.2126, 0.7152, 0.0722))
+  const centre = max(source.rgb, vec3(0, 0, 0))
+  const taps = [vec2(texel.x, float(0)), vec2(texel.x.multiply(-1), float(0)),
+    vec2(float(0), texel.y), vec2(float(0), texel.y.multiply(-1))]
+    .map(offset => lum(max(sampleSceneColor(screenUV.add(offset)).rgb, vec3(0, 0, 0))))
+  const lo = min(min(taps[0], taps[1]), min(taps[2], taps[3]))
+  const hi = max(max(taps[0], taps[1]), max(taps[2], taps[3]))
+  const lc = lum(centre), blur = taps[0].add(taps[1]).add(taps[2]).add(taps[3]).multiply(0.25)
+  const contrast = hi.subtract(lo).divide(hi.add(lo).add(0.02))
+  const amount = float(0.25).multiply(float(1).subtract(clamp(contrast.multiply(1.6), 0, 1))).multiply(smoothstep(float(0.004), float(0.03), lc))
+  const gain = clamp(lc.add(lc.subtract(blur).multiply(amount)).divide(max(lc, float(0.0001))), 0, 4)
+  const radial = screenUV.subtract(vec2(0.5, 0.5))
+  const radius2 = dot(vec2(radial.x, radial.y), vec2(radial.x, radial.y))
+  const lensFalloff = float(1).divide(float(1).add(radius2.multiply(2.4)))
+  const lensTransmission = mix(float(1), lensFalloff.multiply(lensFalloff), vignette)
+  let color: Vec3Node = centre.multiplyScalar(gain).multiplyScalar(exposure).multiplyScalar(lensTransmission)
   color = matrix([0.6274, 0.0691, 0.0164, 0.3293, 0.9195, 0.088, 0.0433, 0.0113, 0.8956]).multiplyVec(color)
   color = matrix([0.856627153315983, 0.137318972929847, 0.11189821299995,
     0.0951212405381588, 0.761241990602591, 0.0767994186031903,
@@ -61,5 +80,5 @@ export function createOriginalComposite() {
   const uv = (z: FloatNode) => vec2(display.x.add(z.multiply(n)).add(0.5).divide(n * n), display.y.add(0.5).divide(n))
   const graded = mix(sampler.sample(uv(layer)).rgb, sampler.sample(uv(min(layer.add(1), float(n - 1)))).rgb, display.z.subtract(layer))
   const output = vec3(toLinear(graded.x), toLinear(graded.y), toLinear(graded.z)).rgba(source.a)
-  return { output, texture, exposure }
+  return { output, texture, exposure, vignette }
 }
